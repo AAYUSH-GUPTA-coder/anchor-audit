@@ -1,0 +1,38 @@
+{
+  "name": "anchor-audit",
+  "version": "0.1.0",
+  "description": "AI-driven security audit CLI for Anchor programs on Solana",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "anchor-audit": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "rules"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "solana",
+    "anchor",
+    "security",
+    "audit",
+    "claude",
+    "smart-contracts"
+  ],
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "chalk": "^5.4.0",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
