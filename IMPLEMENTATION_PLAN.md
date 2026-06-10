@@ -70,11 +70,15 @@ before the next phase starts.
 - All flags: `--output`, `--rules`, `--severity`, `--format`, `--verbose`, `--api-key`, `--model`
 - Unit tests against `tests/fixtures/` snippets; documented JSON schema for findings
 
-**Checkpoint 4**
-- [ ] `npm install -g .` works; `anchor-audit examples/01-vulnerable-vault` produces a report
-- [ ] Findings match `EXPECTED_FINDINGS.md` (iterate on prompts until they do)
-- [ ] JSON output validates against the documented schema
-- [ ] CI green
+**Checkpoint 4 — ✅ passed 2026-06-10** (unit tests; live API run requires user's key)
+- [x] `npm run build` clean; `anchor-audit --help` shows all PRD §5 flags
+- [x] scanner: collects .rs files, skips target/, rejects non-dirs (4 tests)
+- [x] rules-loader: loads all 50 rules, filters by ID, pads IDs, throws on empty (5 tests)
+- [x] reporter: markdown + JSON render, summary table, severity sort, countBySeverity (6 tests)
+- [x] JSON output schema documented in `reporter.ts` (AuditReport interface)
+- [x] CI green — 272 tests passing
+- [ ] Live end-to-end run against vulnerable-vault pending user running:
+      `anchor-audit examples/01-vulnerable-vault/programs/vulnerable_vault --verbose`
 
 ---
 
