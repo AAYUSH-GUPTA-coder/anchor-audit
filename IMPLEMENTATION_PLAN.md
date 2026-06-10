@@ -53,9 +53,10 @@ before the next phase starts.
 - `EXPECTED_FINDINGS.md`: rule ID → file:line → short description (this is the CLI regression oracle)
 - `examples/01-vulnerable-vault/README.md` with warnings (never deploy)
 
-**Checkpoint 3**
-- [ ] Program compiles conceptually as valid Anchor syntax (cargo check if toolchain available; otherwise manual review)
-- [ ] ≥15 rules represented and documented in `EXPECTED_FINDINGS.md`
+**Checkpoint 3 — ✅ passed 2026-06-10**
+- [x] Program is valid Anchor Rust syntax (no toolchain locally; reviewed manually)
+- [x] 17 rules represented across 7 categories (001, 007, 009, 010, 013, 014, 017, 023, 025, 030, 032, 033, 034, 035, 043, 044, 045); 4 Critical, 9 High, 5 Medium
+- [x] `EXPECTED_FINDINGS.md` maps every finding to exact file:line
 
 ---
 
