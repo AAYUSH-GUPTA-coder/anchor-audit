@@ -37,11 +37,11 @@ before the next phase starts.
 
 **Process:** batches of ~10 rules (matching the PRD categories), review each batch before the next.
 
-**Checkpoint 2**
-- [ ] 50 files exist, names match PRD §4.1 exactly
-- [ ] Each file has all 7 template sections and ≥2 references
-- [ ] `INDEX.md` row count = 50, severities assigned
-- [ ] `SKILL.md` < 600 lines and links to every rule
+**Checkpoint 2 — ✅ passed 2026-06-10** (enforced by `tests/rules.test.ts`, 253 assertions)
+- [x] 50 files exist, names match PRD §4.1 exactly
+- [x] Each file has all 7 template sections and ≥2 references
+- [x] `INDEX.md` row count = 50, severities assigned (4 Critical / 21 High / 17 Medium / 8 Low)
+- [x] `SKILL.md` 90 lines (< 600) and links to every rule
 
 ---
 
