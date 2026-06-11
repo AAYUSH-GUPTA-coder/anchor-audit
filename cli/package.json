@@ -29,7 +29,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "chalk": "^5.4.0",
-    "commander": "^13.0.0"
+    "commander": "^13.0.0",
+    "openai": "^4.77.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

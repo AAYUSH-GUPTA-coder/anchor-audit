@@ -1,13 +1,22 @@
 /**
- * Claude API orchestration.
+ * Claude API orchestration — provider-agnostic.
  *
- * Batches the rule catalog into groups of BATCH_SIZE (5), sends each batch
- * alongside the target source files, and parses structured JSON findings
- * from the response. Aggregates and severity-sorts results across all batches.
+ * Anthropic is called natively via @anthropic-ai/sdk (best quality).
+ * Every other provider uses the OpenAI-compatible chat completions API
+ * via the `openai` package with a custom baseURL.
+ *
+ * Provider routing:
+ *   anthropic   → @anthropic-ai/sdk   → api.anthropic.com
+ *   openai      → openai SDK          → api.openai.com/v1
+ *   google      → openai SDK          → generativelanguage.googleapis.com/v1beta/openai/
+ *   groq        → openai SDK          → api.groq.com/openai/v1
+ *   openrouter  → openai SDK          → openrouter.ai/api/v1
+ *   custom      → openai SDK          → <--base-url>
  */
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import chalk from "chalk";
-import type { CliOptions, Severity } from "./index.js";
+import type { CliOptions, Provider, Severity } from "./index.js";
 import type { Rule } from "./rules-loader.js";
 import type { SourceFile } from "./scanner.js";
 
@@ -31,6 +40,41 @@ export const SEVERITY_ORDER: Record<Severity, number> = {
 };
 
 const BATCH_SIZE = 5;
+
+// ---------------------------------------------------------------------------
+// Provider config
+// ---------------------------------------------------------------------------
+
+/** Base URLs for OpenAI-compatible providers. */
+const PROVIDER_BASE_URLS: Partial<Record<Provider, string>> = {
+  openai: "https://api.openai.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  groq: "https://api.groq.com/openai/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+};
+
+/** Environment variable names per provider. */
+const PROVIDER_ENV_VARS: Record<Provider, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  google: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+  custom: "OPENAI_API_KEY",
+};
+
+function resolveApiKey(options: CliOptions): string {
+  const key =
+    options.apiKey ?? process.env[PROVIDER_ENV_VARS[options.provider]];
+  if (!key) {
+    const envVar = PROVIDER_ENV_VARS[options.provider];
+    throw new Error(
+      `No API key found for provider "${options.provider}".\n` +
+        `Set the ${envVar} environment variable or pass --api-key.`
+    );
+  }
+  return key;
+}
 
 // ---------------------------------------------------------------------------
 // Prompt builders
@@ -74,6 +118,63 @@ function buildUser(sources: SourceFile[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// Provider-specific API calls
+// ---------------------------------------------------------------------------
+
+async function callAnthropic(
+  apiKey: string,
+  model: string,
+  system: string,
+  user: string
+): Promise<string> {
+  const client = new Anthropic({ apiKey });
+  const msg = await client.messages.create({
+    model,
+    max_tokens: 4096,
+    system,
+    messages: [{ role: "user", content: user }],
+  });
+  return msg.content[0]?.type === "text" ? msg.content[0].text : "";
+}
+
+async function callOpenAICompatible(
+  apiKey: string,
+  model: string,
+  baseURL: string,
+  system: string,
+  user: string
+): Promise<string> {
+  const client = new OpenAI({ apiKey, baseURL });
+  const response = await client.chat.completions.create({
+    model,
+    max_tokens: 4096,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  });
+  return response.choices[0]?.message?.content ?? "";
+}
+
+async function callProvider(
+  options: CliOptions,
+  apiKey: string,
+  system: string,
+  user: string
+): Promise<string> {
+  if (options.provider === "anthropic") {
+    return callAnthropic(apiKey, options.model, system, user);
+  }
+
+  const baseURL =
+    options.baseUrl ??
+    PROVIDER_BASE_URLS[options.provider] ??
+    "https://api.openai.com/v1";
+
+  return callOpenAICompatible(apiKey, options.model, baseURL, system, user);
+}
+
+// ---------------------------------------------------------------------------
 // Response parsing
 // ---------------------------------------------------------------------------
 
@@ -98,8 +199,7 @@ function parseFindings(raw: string, rules: Rule[]): Finding[] {
     if (typeof item !== "object" || item === null) continue;
     const obj = item as Record<string, unknown>;
 
-    const rawId = String(obj["ruleId"] ?? "");
-    const id = rawId.padStart(3, "0");
+    const id = String(obj["ruleId"] ?? "").padStart(3, "0");
     const rule = ruleMap.get(id);
     if (!rule) continue;
 
@@ -113,7 +213,9 @@ function parseFindings(raw: string, rules: Rule[]): Finding[] {
       title: String(obj["title"] ?? "").slice(0, 200),
       file: String(obj["file"] ?? ""),
       line:
-        typeof obj["line"] === "number" ? Math.max(1, Math.floor(obj["line"])) : null,
+        typeof obj["line"] === "number"
+          ? Math.max(1, Math.floor(obj["line"]))
+          : null,
       description: String(obj["description"] ?? ""),
       vulnerableCode: String(obj["vulnerableCode"] ?? "").slice(0, 800),
       recommendation: String(obj["recommendation"] ?? ""),
@@ -131,24 +233,23 @@ export async function runAudit(
   rules: Rule[],
   options: CliOptions
 ): Promise<Finding[]> {
-  const apiKey = options.apiKey ?? process.env["ANTHROPIC_API_KEY"];
-  if (!apiKey) {
-    throw new Error(
-      "No API key found. Set the ANTHROPIC_API_KEY environment variable or pass --api-key."
-    );
-  }
+  const apiKey = resolveApiKey(options);
 
-  const client = new Anthropic({ apiKey });
-
-  // When --severity is set, skip rules below that threshold entirely.
   const minOrder = options.severity ? SEVERITY_ORDER[options.severity] : 3;
   const eligible = rules.filter((r) => SEVERITY_ORDER[r.severity] <= minOrder);
   if (eligible.length === 0) return [];
 
-  // Slice into batches of BATCH_SIZE.
   const batches: Rule[][] = [];
   for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
     batches.push(eligible.slice(i, i + BATCH_SIZE));
+  }
+
+  if (options.verbose) {
+    process.stderr.write(
+      chalk.dim(
+        `provider: ${options.provider}  model: ${options.model}  batches: ${batches.length}\n`
+      )
+    );
   }
 
   const userContent = buildUser(sources);
@@ -165,21 +266,19 @@ export async function runAudit(
       );
     }
 
-    let msg: Anthropic.Message;
+    let responseText: string;
     try {
-      msg = await client.messages.create({
-        model: options.model,
-        max_tokens: 4096,
-        system: buildSystem(batch),
-        messages: [{ role: "user", content: userContent }],
-      });
+      responseText = await callProvider(
+        options,
+        apiKey,
+        buildSystem(batch),
+        userContent
+      );
     } catch (err) {
-      const text = err instanceof Error ? err.message : String(err);
-      throw new Error(`Claude API error on batch ${i + 1}: ${text}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`API error on batch ${i + 1} (${options.provider}): ${msg}`);
     }
 
-    const responseText =
-      msg.content[0]?.type === "text" ? msg.content[0].text : "";
     const batchFindings = parseFindings(responseText, batch);
 
     if (options.verbose && batchFindings.length > 0) {
@@ -191,12 +290,10 @@ export async function runAudit(
     allFindings.push(...batchFindings);
   }
 
-  // Apply severity filter to findings as well (model may downgrade severity).
   const filtered = allFindings.filter(
     (f) => SEVERITY_ORDER[f.severity] <= minOrder
   );
 
-  // Sort critical → low, stable within each tier.
   return filtered.sort(
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
   );
