@@ -41,7 +41,7 @@ Requires Node 20+ and an API key for any supported AI provider.
 npm install -g anchor-audit
 ```
 
-Set your API key (pick the provider you use):
+Set your API key for your chosen cloud provider. **Local providers (Ollama, LM Studio, vLLM) require no API key.**
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...   # Anthropic (default)
@@ -49,66 +49,125 @@ export OPENAI_API_KEY=sk-...          # OpenAI
 export GEMINI_API_KEY=...             # Google Gemini
 export GROQ_API_KEY=gsk_...          # Groq (free tier available)
 export OPENROUTER_API_KEY=sk-or-...  # OpenRouter
+# Ollama / LM Studio / vLLM — no key needed
 ```
 
 ---
 
 ## Usage
 
-### CLI
+### Cloud providers
 
 ```bash
-# Full audit, markdown report to stdout
-anchor-audit ./programs/my-vault
+# Default — Anthropic claude-sonnet-4-6
+anchor-audit ./programs/my-vault --verbose
 
-# Save report to file
-anchor-audit ./programs/my-vault --output AUDIT.md
+# OpenAI
+anchor-audit ./programs/my-vault --provider openai --model gpt-4o
 
+# Google Gemini
+anchor-audit ./programs/my-vault --provider google --model gemini-2.0-flash
+
+# Groq (free tier)
+anchor-audit ./programs/my-vault --provider groq
+
+# OpenRouter (access any model via one key)
+anchor-audit ./programs/my-vault --provider openrouter --model meta-llama/llama-3.3-70b-instruct
+```
+
+### Local providers (no API key, no cost)
+
+Start your local inference server first, then point `anchor-audit` at it:
+
+```bash
+# Ollama (default port 11434)
+ollama pull llama3.1:8b
+anchor-audit ./programs/my-vault --provider ollama --model llama3.1:8b
+
+# Ollama with a larger model
+anchor-audit ./programs/my-vault --provider ollama --model qwen2.5-coder:32b
+
+# LM Studio (default port 1234) — load any model in the LM Studio UI first
+anchor-audit ./programs/my-vault --provider lmstudio --model local-model
+
+# vLLM (default port 8000)
+anchor-audit ./programs/my-vault --provider vllm --model mistral-7b-instruct
+
+# Custom endpoint (any OpenAI-compatible server)
+anchor-audit ./programs/my-vault --provider custom \
+  --base-url http://192.168.1.10:8080/v1 \
+  --model gemma3:27b
+```
+
+Override the default port with `--base-url`:
+
+```bash
+anchor-audit ./programs/my-vault --provider ollama \
+  --base-url http://localhost:5000/v1 \
+  --model kimi-k2
+```
+
+### Common options
+
+```bash
 # Run only specific rules
 anchor-audit ./programs/my-vault --rules 001,017,030
 
 # Show only high and critical findings
 anchor-audit ./programs/my-vault --severity high
 
+# Higher effort (more tokens = deeper analysis, slower + costlier)
+anchor-audit ./programs/my-vault --effort high
+
 # JSON output
-anchor-audit ./programs/my-vault --format json --output audit.json
+anchor-audit ./programs/my-vault --format json
 
-# Verbose (shows rule batches as they run)
-anchor-audit ./programs/my-vault --verbose
-
-# Use a different provider or model
-anchor-audit ./programs/my-vault --provider openai --model gpt-4o
-anchor-audit ./programs/my-vault --provider google --model gemini-2.0-flash
-anchor-audit ./programs/my-vault --provider groq   # free tier
-anchor-audit ./programs/my-vault --provider custom --base-url http://localhost:11434/v1 --model llama3.1:8b --api-key ollama
+# Save to a specific file (auto-save to reports/ always happens too)
+anchor-audit ./programs/my-vault --output AUDIT.md
 ```
+
+### Auto-saved reports
+
+Every run automatically saves a timestamped report to `reports/` so no audit is ever lost:
+
+```
+reports/
+  my-vault-2026-06-19T14-30-15Z.md
+  my-vault-2026-06-20T09-12-44Z.md
+```
+
+The `reports/` directory is gitignored by default. Use `--output` to additionally save to a specific path.
 
 ### All flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--output <path>` | stdout | Write report to file |
+| `--output <path>` | — | Also write report to this specific file |
 | `--rules <ids>` | all 50 | Comma-separated rule IDs, e.g. `001,017,030` |
-| `--severity <min>` | low | Minimum severity: `critical \| high \| medium \| low` |
+| `--severity <min>` | `low` | Minimum severity: `critical \| high \| medium \| low` |
 | `--format <fmt>` | `markdown` | `markdown` or `json` |
+| `--effort <level>` | `medium` | `low` (2k tokens) \| `medium` (4k) \| `high` (8k) |
 | `--verbose` | off | Print per-batch progress |
-| `--api-key <key>` | env var | Override provider env var |
-| `--provider <name>` | `anthropic` | `anthropic \| openai \| google \| groq \| openrouter \| custom` |
+| `--api-key <key>` | env var | Override provider env var (not needed for local providers) |
+| `--provider <name>` | `anthropic` | See table below |
 | `--model <id>` | per-provider | Override default model |
-| `--base-url <url>` | — | Base URL for `--provider custom` (Ollama, LM Studio, etc.) |
+| `--base-url <url>` | per-provider | Override inference endpoint URL |
 
-**Default models per provider:**
+**Providers and defaults:**
 
-| Provider | Default model |
-|----------|--------------|
-| `anthropic` | `claude-sonnet-4-6` |
-| `openai` | `gpt-4o` |
-| `google` | `gemini-2.0-flash` |
-| `groq` | `llama-3.3-70b-versatile` |
-| `openrouter` | `anthropic/claude-sonnet-4-6` |
-| `custom` | `gpt-4o` |
+| Provider | Type | Default model | API key env var |
+|----------|------|--------------|-----------------|
+| `anthropic` | Cloud | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
+| `openai` | Cloud | `gpt-4o` | `OPENAI_API_KEY` |
+| `google` | Cloud | `gemini-2.0-flash` | `GEMINI_API_KEY` |
+| `groq` | Cloud | `llama-3.3-70b-versatile` | `GROQ_API_KEY` |
+| `openrouter` | Cloud | `anthropic/claude-sonnet-4-6` | `OPENROUTER_API_KEY` |
+| `ollama` | Local | `llama3.1:8b` | none |
+| `lmstudio` | Local | `local-model` | none |
+| `vllm` | Local | `local-model` | none |
+| `custom` | Local/Cloud | `gpt-4o` | `OPENAI_API_KEY` |
 
-> **Note on model quality:** Finding accuracy depends on the underlying model. Claude Opus 4.8 or GPT-4o will produce more precise, lower-noise results than smaller or free-tier models. All providers share the same rule prompts; only the model's ability to follow them differs.
+> **Note on model quality:** Finding accuracy depends on the underlying model. Claude Opus 4.8 or GPT-4o produce more precise, lower-noise results than smaller or free-tier models. Local models are great for cost-free exploration but may miss subtle patterns. All providers share the same rule prompts; only the model's reasoning ability differs.
 
 ### Exit codes
 

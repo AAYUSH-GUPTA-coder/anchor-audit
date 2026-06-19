@@ -1,22 +1,27 @@
 /**
- * Claude API orchestration — provider-agnostic.
+ * AI API orchestration — provider-agnostic.
  *
  * Anthropic is called natively via @anthropic-ai/sdk (best quality).
- * Every other provider uses the OpenAI-compatible chat completions API
- * via the `openai` package with a custom baseURL.
+ * Every other provider (cloud and local) uses the OpenAI-compatible chat
+ * completions API via the `openai` package with a custom baseURL.
  *
- * Provider routing:
+ * Cloud routing:
  *   anthropic   → @anthropic-ai/sdk   → api.anthropic.com
  *   openai      → openai SDK          → api.openai.com/v1
  *   google      → openai SDK          → generativelanguage.googleapis.com/v1beta/openai/
  *   groq        → openai SDK          → api.groq.com/openai/v1
  *   openrouter  → openai SDK          → openrouter.ai/api/v1
+ *
+ * Local routing (no API key required):
+ *   ollama      → openai SDK          → http://localhost:11434/v1
+ *   lmstudio    → openai SDK          → http://localhost:1234/v1
+ *   vllm        → openai SDK          → http://localhost:8000/v1
  *   custom      → openai SDK          → <--base-url>
  */
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import chalk from "chalk";
-import type { CliOptions, Provider, Severity } from "./index.js";
+import type { CliOptions, Effort, Provider, Severity } from "./index.js";
 import type { Rule } from "./rules-loader.js";
 import type { SourceFile } from "./scanner.js";
 
@@ -39,22 +44,34 @@ export const SEVERITY_ORDER: Record<Severity, number> = {
   low: 3,
 };
 
+/** Max tokens per provider call, controlled by --effort. */
+const EFFORT_MAX_TOKENS: Record<Effort, number> = {
+  low: 2048,
+  medium: 4096,
+  high: 8192,
+};
+
 const BATCH_SIZE = 5;
 
 // ---------------------------------------------------------------------------
 // Provider config
 // ---------------------------------------------------------------------------
 
-/** Base URLs for OpenAI-compatible providers. */
+/** Base URLs for OpenAI-compatible providers (cloud and local). */
 const PROVIDER_BASE_URLS: Partial<Record<Provider, string>> = {
+  // Cloud
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai/",
   groq: "https://api.groq.com/openai/v1",
   openrouter: "https://openrouter.ai/api/v1",
+  // Local — override with --base-url if your server runs on a different port
+  ollama: "http://localhost:11434/v1",
+  lmstudio: "http://localhost:1234/v1",
+  vllm: "http://localhost:8000/v1",
 };
 
-/** Environment variable names per provider. */
-const PROVIDER_ENV_VARS: Record<Provider, string> = {
+/** Environment variable names per cloud provider. */
+const PROVIDER_ENV_VARS: Partial<Record<Provider, string>> = {
   anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
   google: "GEMINI_API_KEY",
@@ -63,17 +80,28 @@ const PROVIDER_ENV_VARS: Record<Provider, string> = {
   custom: "OPENAI_API_KEY",
 };
 
+/** Local providers don't use real API keys; the OpenAI SDK still requires a non-empty string. */
+const LOCAL_PROVIDERS = new Set<Provider>(["ollama", "lmstudio", "vllm"]);
+const LOCAL_KEY_PLACEHOLDER = "local";
+
 function resolveApiKey(options: CliOptions): string {
-  const key =
-    options.apiKey ?? process.env[PROVIDER_ENV_VARS[options.provider]];
-  if (!key) {
-    const envVar = PROVIDER_ENV_VARS[options.provider];
-    throw new Error(
-      `No API key found for provider "${options.provider}".\n` +
-        `Set the ${envVar} environment variable or pass --api-key.`
-    );
+  if (options.apiKey) return options.apiKey;
+
+  const envVar = PROVIDER_ENV_VARS[options.provider];
+  if (envVar) {
+    const key = process.env[envVar];
+    if (key) return key;
   }
-  return key;
+
+  // Local providers work without a real API key.
+  if (LOCAL_PROVIDERS.has(options.provider)) {
+    return LOCAL_KEY_PLACEHOLDER;
+  }
+
+  throw new Error(
+    `No API key found for provider "${options.provider}".\n` +
+      `Set the ${PROVIDER_ENV_VARS[options.provider] ?? "OPENAI_API_KEY"} environment variable or pass --api-key.`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -124,13 +152,14 @@ function buildUser(sources: SourceFile[]): string {
 async function callAnthropic(
   apiKey: string,
   model: string,
+  maxTokens: number,
   system: string,
   user: string
 ): Promise<string> {
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system,
     messages: [{ role: "user", content: user }],
   });
@@ -141,13 +170,14 @@ async function callOpenAICompatible(
   apiKey: string,
   model: string,
   baseURL: string,
+  maxTokens: number,
   system: string,
   user: string
 ): Promise<string> {
   const client = new OpenAI({ apiKey, baseURL });
   const response = await client.chat.completions.create({
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -162,8 +192,10 @@ async function callProvider(
   system: string,
   user: string
 ): Promise<string> {
+  const maxTokens = EFFORT_MAX_TOKENS[options.effort];
+
   if (options.provider === "anthropic") {
-    return callAnthropic(apiKey, options.model, system, user);
+    return callAnthropic(apiKey, options.model, maxTokens, system, user);
   }
 
   const baseURL =
@@ -171,7 +203,7 @@ async function callProvider(
     PROVIDER_BASE_URLS[options.provider] ??
     "https://api.openai.com/v1";
 
-  return callOpenAICompatible(apiKey, options.model, baseURL, system, user);
+  return callOpenAICompatible(apiKey, options.model, baseURL, maxTokens, system, user);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +279,7 @@ export async function runAudit(
   if (options.verbose) {
     process.stderr.write(
       chalk.dim(
-        `provider: ${options.provider}  model: ${options.model}  batches: ${batches.length}\n`
+        `provider: ${options.provider}  model: ${options.model}  effort: ${options.effort}  batches: ${batches.length}\n`
       )
     );
   }
