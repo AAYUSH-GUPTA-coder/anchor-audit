@@ -10,7 +10,7 @@ Anchor programs handle real money on-chain. A single missing signer check or unc
 
 ## What is anchor-audit?
 
-`anchor-audit` checks your Rust/Anchor source files against a catalog of **50 known Solana security rules** — things like missing signer checks, arbitrary CPI targets, arithmetic overflows, and reinitialization attacks. It sends your code to an AI model that reads each rule and flags any matching patterns, then formats the results into a structured report.
+`anchor-audit` checks your Rust/Anchor source files against a catalog of **50 known Solana security rules** - things like missing signer checks, arbitrary CPI targets, arithmetic overflows, and reinitialization attacks. It sends your code to an AI model that reads each rule and flags any matching patterns, then formats the results into a structured report.
 
 It ships as two tools that share the same 50-rule catalog:
 
@@ -42,32 +42,58 @@ Both tools stay in sync: when a rule is improved in `/rules/`, both the skill an
 
 ## Quick Start
 
-**Option A — Claude Code Skill (fastest):**
+**Option A - Claude Code Skill (fastest):**
 ```bash
 git clone https://github.com/guptaaayush432/anchor-audit
 cp anchor-audit/SKILL.md ~/.claude/skills/anchor-audit.md
 # Then in any Claude Code session: "audit my program in ./programs/my-vault"
 ```
 
-**Option B — CLI with Anthropic (most accurate):**
+**Option B - CLI with a cloud provider:**
 ```bash
 npm install -g anchor-audit
-export ANTHROPIC_API_KEY=sk-ant-...
+
+# Set your API key for whichever provider you use
+export ANTHROPIC_API_KEY=sk-ant-...   # Anthropic (default)
+export OPENAI_API_KEY=sk-...          # OpenAI
+export GROQ_API_KEY=gsk_...           # Groq (free tier)
+
+# Basic run - uses Anthropic claude-sonnet-4-6 by default
+anchor-audit ./programs/my-vault
+
+# Show progress as each rule batch is processed
 anchor-audit ./programs/my-vault --verbose
+
+# Use a different provider or model
+anchor-audit ./programs/my-vault --provider openai --model gpt-4o
+anchor-audit ./programs/my-vault --provider groq
+
+# Only check critical and high severity rules (faster)
+anchor-audit ./programs/my-vault --severity high
+
+# Deeper analysis with more output per finding
+anchor-audit ./programs/my-vault --effort high
+
+# Fast triage - high severity rules only, low token budget
+anchor-audit ./programs/my-vault --severity high --effort low
+
+# Save report to a file
+anchor-audit ./programs/my-vault --output AUDIT.md
 ```
 
-**Option C — CLI with Ollama (free, runs locally):**
+**Option C - CLI with Ollama (free, runs locally):**
 ```bash
 npm install -g anchor-audit
 ollama pull llama3.1:8b
-anchor-audit ./programs/my-vault --provider ollama --effort low --severity high
+anchor-audit ./programs/my-vault --provider ollama --effort low
+# Change the model and reasoning effort accordingly
 ```
 
 ---
 
 ## Claude Code Skill
 
-The Claude Code Skill lets you audit Anchor programs directly inside a Claude Code session — no API key needed beyond your existing Claude subscription, no extra installation beyond copying one file.
+The Claude Code Skill lets you audit Anchor programs directly inside a Claude Code session - no API key needed beyond your existing Claude/Codex subscription, no extra installation beyond copying one file.
 
 ### Install
 
@@ -78,7 +104,7 @@ cp anchor-audit/SKILL.md ~/.claude/skills/anchor-audit.md
 
 ### How to use it
 
-Once installed, Claude picks up the skill automatically whenever you ask it to review Anchor code. Just describe what you want in plain English:
+Once installed, Claude/Codex picks up the skill automatically whenever you ask it to review Anchor code. Just describe what you want in plain English:
 
 ```
 > audit my anchor program in ./programs/my-vault
@@ -88,7 +114,7 @@ Once installed, Claude picks up the skill automatically whenever you ask it to r
 > look for missing signer checks in programs/staking/src/lib.rs
 ```
 
-Claude will read your source files, apply the 50-rule catalog, and respond with a structured list of findings.
+Claude/Codex will read your source files, apply the 50-rule catalog, and respond with a structured list of findings.
 
 ### When to use the Skill vs the CLI
 
@@ -107,7 +133,7 @@ Claude will read your source files, apply the 50-rule catalog, and respond with 
 ### Requirements
 
 - Node.js 20 or later (`node --version` to check)
-- An AI provider — cloud (needs API key) or local (needs Ollama/LM Studio/vLLM running)
+- An AI provider - cloud (needs API key) or local (needs Ollama/LM Studio/vLLM running)
 
 ### Install
 
@@ -129,7 +155,7 @@ Cloud providers are the easiest to start with and produce the most accurate resu
 
 ### Anthropic (default, recommended)
 
-Best overall accuracy for security auditing. Uses `claude-sonnet-4-6` by default.
+Best overall accuracy for security auditing. Uses `claude-sonnet-4-6` by default. Change Accordingly.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -164,9 +190,9 @@ anchor-audit ./programs/my-vault --provider google --model gemini-2.0-flash
 
 **Where to get a key:** [aistudio.google.com](https://aistudio.google.com)
 
-### Groq (free tier available)
+### Groq
 
-Groq offers a generous free tier — a good way to try the tool at no cost with a cloud model.
+Groq offers a generous free tier - a good way to try the tool at no cost with a cloud model.
 
 ```bash
 export GROQ_API_KEY=gsk_...
@@ -194,13 +220,13 @@ anchor-audit ./programs/my-vault --provider openrouter --model google/gemini-2.0
 
 Local models run entirely on your machine. No data leaves your computer, there are no API costs, and you can audit private code without sending it to a third party.
 
-The trade-off is speed and accuracy — local models are slower and may miss subtle issues that a large cloud model would catch. See [Performance Guide](#performance-guide) for tips.
+The trade-off is speed and accuracy - local models are slower and may miss subtle issues that a large cloud model would catch. See [Performance Guide](#performance-guide) for tips.
 
 ### Ollama
 
 [Ollama](https://ollama.com) is the easiest way to run local models on macOS, Linux, or Windows.
 
-**Step 1 — Install Ollama:**
+**Step 1 - Install Ollama:**
 ```bash
 # macOS
 brew install ollama
@@ -208,7 +234,7 @@ brew install ollama
 # Or download from https://ollama.com
 ```
 
-**Step 2 — Pull a model:**
+**Step 2 - Pull a model:**
 ```bash
 # Small and fast (good for quick checks)
 ollama pull llama3.1:8b
@@ -218,12 +244,12 @@ ollama pull qwen2.5-coder:32b
 ollama pull llama3.3:70b
 ```
 
-**Step 3 — Start the Ollama server** (it may already be running):
+**Step 3 - Start the Ollama server** (it may already be running):
 ```bash
 ollama serve
 ```
 
-**Step 4 — Run the audit:**
+**Step 4 - Run the audit:**
 ```bash
 # No API key needed
 anchor-audit ./programs/my-vault --provider ollama --model llama3.1:8b
@@ -240,17 +266,17 @@ anchor-audit ./programs/my-vault --provider ollama \
 
 [LM Studio](https://lmstudio.ai) provides a desktop GUI for downloading and running local models.
 
-**Step 1** — Download and open LM Studio  
-**Step 2** — Download a model from the Discover tab (e.g. Mistral 7B, Qwen 2.5)  
-**Step 3** — Go to the Local Server tab and click **Start Server**  
-**Step 4** — Run the audit:
+**Step 1** - Download and open LM Studio  
+**Step 2** - Download a model from the Discover tab (e.g. Mistral 7B, Qwen 2.5)  
+**Step 3** - Go to the Local Server tab and click **Start Server**  
+**Step 4** - Run the audit:
 
 ```bash
 # LM Studio's server runs on port 1234 by default
 anchor-audit ./programs/my-vault --provider lmstudio --model local-model
 ```
 
-The `--model local-model` value is a placeholder — LM Studio uses whichever model is currently loaded in its UI.
+The `--model local-model` value is a placeholder - LM Studio uses whichever model is currently loaded in its UI.
 
 ### vLLM
 
@@ -296,7 +322,7 @@ anchor-audit ./programs/my-vault --verbose
 
 ### Filter by severity
 
-`--severity` controls **which rules are checked**. Rules below the chosen level are skipped entirely — fewer rules means fewer batches, which means a faster run.
+`--severity` controls **which rules are checked**. Rules below the chosen level are skipped entirely - fewer rules means fewer batches, which means a faster run.
 
 ```
 --severity critical   →  4 rules  →  1 batch   (fastest)
@@ -318,7 +344,7 @@ anchor-audit ./programs/my-vault
 
 ### Control analysis depth
 
-`--effort` controls **how many output tokens the model is allowed to generate per batch**. More tokens means the model can write longer, more detailed findings — but each batch takes longer.
+`--effort` controls **how many output tokens the model is allowed to generate per batch**. More tokens means the model can write longer, more detailed findings - but each batch takes longer.
 
 | Effort | Max tokens | Best for |
 |--------|-----------|----------|
@@ -327,10 +353,10 @@ anchor-audit ./programs/my-vault
 | `high` | 8,192 | Cloud models, thorough reports |
 
 ```bash
-# Fast triage — good for local models or quick CI checks
+# Fast triage - good for local models or quick CI checks
 anchor-audit ./programs/my-vault --effort low --severity high
 
-# Deep analysis — good for pre-release audits with a cloud model
+# Deep analysis - good for pre-release audits with a cloud model
 anchor-audit ./programs/my-vault --effort high
 ```
 
@@ -379,12 +405,12 @@ anchor-audit ./programs/my-vault \
 | `--model <id>` | per-provider | Override the default model for the chosen provider |
 | `--api-key <key>` | env var | Pass your API key inline instead of via environment variable |
 | `--base-url <url>` | per-provider | Override the server URL (useful for local models on non-default ports) |
-| `--severity <level>` | `low` | Only check rules at this level or above. Does not filter the *output* — it skips rules entirely |
+| `--severity <level>` | `low` | Only check rules at this level or above. Does not filter the *output* - it skips rules entirely |
 | `--effort <level>` | `medium` | How many tokens the model can use per batch. Higher = more detail, slower |
 | `--rules <ids>` | all 50 | Comma-separated list of rule IDs to run, e.g. `001,017,030` |
 | `--format <fmt>` | `markdown` | Output format: `markdown` or `json` |
-| `--output <path>` | — | Write the report to this file in addition to the auto-saved copy |
-| `--verbose` | off | Print each batch as it's sent to the model — useful for tracking progress |
+| `--output <path>` | - | Write the report to this file in addition to the auto-saved copy |
+| `--verbose` | off | Print each batch as it's sent to the model - useful for tracking progress |
 
 **Provider defaults:**
 
@@ -404,9 +430,9 @@ anchor-audit ./programs/my-vault \
 
 | Code | Meaning |
 |------|---------|
-| `0` | Audit complete — no critical or high findings |
-| `1` | Audit complete — at least one critical or high finding was found |
-| `2` | Error — bad path, missing API key, connection refused, etc. |
+| `0` | Audit complete - no critical or high findings |
+| `1` | Audit complete - at least one critical or high finding was found |
+| `2` | Error - bad path, missing API key, connection refused, etc. |
 
 Exit code `1` is useful in CI: add `anchor-audit` as a pipeline step and it will block the build if critical issues are found.
 
@@ -516,7 +542,7 @@ anchor-audit ./programs/my-vault --provider ollama --effort low --severity high
 # 3. Use --severity critical for a 1-batch quick check (4 rules only)
 anchor-audit ./programs/my-vault --provider ollama --severity critical
 
-# 4. Use a smaller model — 3B or 4B models are 2–3x faster than 8B
+# 4. Use a smaller model - 3B or 4B models are 2–3x faster than 8B
 ollama pull llama3.2:3b
 anchor-audit ./programs/my-vault --provider ollama --model llama3.2:3b --effort low
 ```
@@ -607,8 +633,8 @@ anchor-audit ./programs/my-vault --provider ollama --model llama3.2:3b --effort 
 - Issues in client-side TypeScript/JavaScript code
 
 **What it may get wrong:**
-- False positives — patterns that look like a rule but are safe in context (e.g. an `AccountInfo` that is verified elsewhere)
-- False negatives — real issues the model fails to recognize because the code pattern is unusual
+- False positives - patterns that look like a rule but are safe in context (e.g. an `AccountInfo` that is verified elsewhere)
+- False negatives - real issues the model fails to recognize because the code pattern is unusual
 
 **What it does not cover:**
 - Dynamic analysis or fuzzing
@@ -633,16 +659,16 @@ The same 50 rules are sent to every model. A larger, more capable model produces
 Each rule is a single markdown file in `/rules/` following a fixed template with seven required sections: description, vulnerable pattern, why it's dangerous, fix pattern, detection heuristic, references, and real-world exploits.
 
 1. Copy the template from [rules/README.md](rules/README.md) into a new file: `rules/NNN-kebab-name.md`
-2. Fill in all seven sections — no section may be left blank
+2. Fill in all seven sections - no section may be left blank
 3. Cite your sources in the References section (Neodyme, Sec3, Helius, Anchor book, Cyfrin Updraft, public audit reports)
 4. Add a row to [rules/INDEX.md](rules/INDEX.md)
-5. Run the test suite — it validates every rule file automatically
+5. Run the test suite - it validates every rule file automatically
 
 ### Running tests locally
 
 ```bash
 npm install
-npm test           # 272 unit tests — all rules, scanner, reporter
+npm test           # 272 unit tests - all rules, scanner, reporter
 npm run typecheck  # TypeScript strict check
 npm run lint       # ESLint
 ```
@@ -655,4 +681,4 @@ Open an issue at [github.com/guptaaayush432/anchor-audit/issues](https://github.
 
 ## License
 
-[MIT](./LICENSE) — Aayush Gupta, 2026
+[MIT](./LICENSE) - Aayush Gupta, 2026
