@@ -53,10 +53,9 @@ cp anchor-audit/SKILL.md ~/.claude/skills/anchor-audit.md
 ```bash
 npm install -g anchor-audit
 
-# Set your API key for whichever provider you use
-export ANTHROPIC_API_KEY=sk-ant-...   # Anthropic (default)
-export OPENAI_API_KEY=sk-...          # OpenAI
-export GROQ_API_KEY=gsk_...           # Groq (free tier)
+# Copy the example env file and add your key
+cp .env.example .env
+# Edit .env and fill in the key for your chosen provider
 
 # Basic run - uses Anthropic claude-sonnet-4-6 by default
 anchor-audit ./programs/my-vault
@@ -151,14 +150,35 @@ anchor-audit --help
 
 ## Cloud Providers
 
-Cloud providers are the easiest to start with and produce the most accurate results. You sign up for an API key, set an environment variable, and you're done.
+Cloud providers are the easiest to start with and produce the most accurate results.
+
+### Setting up your API key
+
+All API keys are loaded from a `.env` file in your project root. Copy the example file and fill in the key for the provider you want to use:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and add your key:
+
+```env
+# Only fill in the provider you plan to use
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=...
+GROQ_API_KEY=gsk_...
+OPENROUTER_API_KEY=sk-or-...
+```
+
+Never use `export KEY=...` in your terminal - that sets the key globally for all tools and sessions, which can accidentally bill API credits when you did not intend to.
 
 ### Anthropic (default, recommended)
 
-Best overall accuracy for security auditing. Uses `claude-sonnet-4-6` by default. Change Accordingly.
+Best overall accuracy for security auditing. Uses `claude-sonnet-4-6` by default.
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+# In .env: ANTHROPIC_API_KEY=sk-ant-...
 anchor-audit ./programs/my-vault
 ```
 
@@ -173,7 +193,7 @@ anchor-audit ./programs/my-vault --model claude-opus-4-8
 ### OpenAI (ChatGPT)
 
 ```bash
-export OPENAI_API_KEY=sk-...
+# In .env: OPENAI_API_KEY=sk-...
 anchor-audit ./programs/my-vault --provider openai
 anchor-audit ./programs/my-vault --provider openai --model gpt-4o
 ```
@@ -183,7 +203,7 @@ anchor-audit ./programs/my-vault --provider openai --model gpt-4o
 ### Google Gemini
 
 ```bash
-export GEMINI_API_KEY=...
+# In .env: GEMINI_API_KEY=...
 anchor-audit ./programs/my-vault --provider google
 anchor-audit ./programs/my-vault --provider google --model gemini-2.0-flash
 ```
@@ -195,7 +215,7 @@ anchor-audit ./programs/my-vault --provider google --model gemini-2.0-flash
 Groq offers a generous free tier - a good way to try the tool at no cost with a cloud model.
 
 ```bash
-export GROQ_API_KEY=gsk_...
+# In .env: GROQ_API_KEY=gsk_...
 anchor-audit ./programs/my-vault --provider groq
 ```
 
@@ -203,10 +223,10 @@ anchor-audit ./programs/my-vault --provider groq
 
 ### OpenRouter (access 100+ models with one key)
 
-OpenRouter is a single API that routes to Anthropic, OpenAI, Meta, Mistral, and many others. Useful if you want to compare results across models.
+OpenRouter routes to Anthropic, OpenAI, Meta, Mistral, and many others. Useful if you want to compare results across models.
 
 ```bash
-export OPENROUTER_API_KEY=sk-or-...
+# In .env: OPENROUTER_API_KEY=sk-or-...
 anchor-audit ./programs/my-vault --provider openrouter
 anchor-audit ./programs/my-vault --provider openrouter --model meta-llama/llama-3.3-70b-instruct
 anchor-audit ./programs/my-vault --provider openrouter --model google/gemini-2.0-flash
