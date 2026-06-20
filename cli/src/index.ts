@@ -94,7 +94,7 @@ program
     "analysis depth — low (2 k tokens) | medium (4 k) | high (8 k)",
     "medium"
   )
-  .version("0.1.0")
+  .version("0.1.1")
   .action(async (targetPath: string, opts: Partial<CliOptions>) => {
     const startTime = new Date();
     const provider = (opts.provider ?? "anthropic") as Provider;

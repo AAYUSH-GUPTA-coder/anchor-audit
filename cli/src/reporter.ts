@@ -23,7 +23,7 @@ import { SEVERITY_ORDER, type Finding } from "./auditor.js";
 import type { CliOptions, Severity } from "./index.js";
 import type { AuditMetadata } from "./metadata.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 // ---------------------------------------------------------------------------
 // Helpers

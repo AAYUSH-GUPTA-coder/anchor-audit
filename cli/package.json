@@ -1,6 +1,6 @@
 {
   "name": "anchor-audit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-driven security audit CLI for Anchor programs on Solana",
   "license": "MIT",
   "type": "module",
@@ -16,8 +16,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "rm -rf ./rules && cp -r ../rules ./rules && npm run build",
-    "postpublish": "rm -rf ./rules"
+    "prepublishOnly": "rm -rf ./rules && cp -r ../rules ./rules && cp ../README.md ./README.md && npm run build",
+    "postpublish": "rm -rf ./rules && git checkout README.md"
   },
   "keywords": [
     "solana",
