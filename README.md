@@ -1,5 +1,7 @@
 # anchor-audit
 
+[![npm version](https://img.shields.io/npm/v/anchor-audit)](https://www.npmjs.com/package/anchor-audit)
+
 A security audit toolkit for [Anchor](https://www.anchor-lang.com/) smart contracts on Solana.
 
 Anchor programs handle real money on-chain. A single missing signer check or unchecked arithmetic operation can drain a protocol entirely. `anchor-audit` gives developers a fast, structured first pass over their code before it ships.
@@ -238,9 +240,11 @@ anchor-audit ./programs/my-vault --provider openrouter --model google/gemini-2.0
 
 ## Local Models (no API key, no cost)
 
+> **Warning:** Local models produce significantly worse results than cloud models. In testing, an 8B local model (qwen3 via Ollama) returned zero findings on a real-world program that a cloud model flagged multiple issues in. Use local models only for quick exploratory checks during development - never for a final audit before shipping.
+
 Local models run entirely on your machine. No data leaves your computer, there are no API costs, and you can audit private code without sending it to a third party.
 
-The trade-off is speed and accuracy - local models are slower and may miss subtle issues that a large cloud model would catch. See [Performance Guide](#performance-guide) for tips.
+The trade-off is speed and accuracy - local models are slower and miss many real issues that a cloud model would catch. See [Performance Guide](#performance-guide) for tips.
 
 ### Ollama
 
